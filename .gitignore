@@ -1,0 +1,38 @@
+# 외부 공식 저장소 (scripts/clone_upstream.sh 로 받음)
+third_party/*
+!third_party/README.md
+
+# 학습 산출물
+logs/
+runs/
+outputs/
+*.pt
+*.onnx
+*.ckpt
+wandb/
+
+# Python / C++ 빌드
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+install/
+log/
+
+# 비밀 정보
+.env
+secrets/
+*.key
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 브라우저 자동화 시험 산출물
+.playwright-mcp/
+
+# MuJoCo 실행 로그
+MUJOCO_LOG.TXT

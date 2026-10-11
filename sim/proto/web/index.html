@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lite3 Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234c8dff'/%3E%3Cpath d='M4 14h3l2-4h6l2 4h3M6 14v5M18 14v5M9 14v5M15 14v5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/web/vendor/codemirror.css">
+  <link rel="stylesheet" href="/web/style.css">
+  <script src="/web/vendor/codemirror.js"></script>
+  <script src="/web/vendor/python.js"></script>
+  <script src="/web/vendor/matchbrackets.js"></script>
+  <script src="/web/vendor/active-line.js"></script>
+  <script type="importmap">{ "imports": { "three": "/web/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" class="logo" aria-hidden="true"><path d="M4 14h3l2-4h6l2 4h3M6 14v5M18 14v5M9 14v5M15 14v5M15 10l2-4h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Lite3 Studio</span>
+    </div>
+    <div class="tb-group">
+      <label class="select">
+        <span class="select-label">샘플</span>
+        <select id="sample"></select>
+      </label>
+      <button class="btn ghost" id="btn-revert" title="샘플을 처음 상태로">원래대로</button>
+      <span class="sep"></span>
+      <button class="btn ghost" id="btn-open">열기</button>
+      <button class="btn ghost" id="btn-save">저장</button>
+    </div>
+    <div class="tb-group right">
+      <span class="pill" id="sim-pill"><i></i><b>연결 중</b></span>
+      <button class="btn ghost" id="btn-reset" title="로봇을 엎드린 처음 자세로">↺ 처음 자세</button>
+      <button class="btn danger" id="btn-stop" disabled>■ 정지 <kbd>Esc</kbd></button>
+      <button class="btn primary" id="btn-run">▶ 실행 <kbd>F5</kbd></button>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+    <section class="col left">
+      <div class="pane editor-pane">
+        <div class="pane-head">
+          <span class="pane-title" id="file-title">내 코드</span>
+          <span class="muted small" id="file-hint">F5 실행 · Esc 정지 · Ctrl+S 저장</span>
+        </div>
+        <div id="editor"></div>
+      </div>
+      <div class="hsplit" data-target="console-pane"></div>
+      <div class="pane console-pane" id="console-pane">
+        <div class="pane-head">
+          <span class="pane-title">출력</span>
+          <span class="muted small" id="run-status">준비</span>
+          <button class="btn tiny ghost" id="btn-clear">지우기</button>
+        </div>
+        <pre id="console"></pre>
+      </div>
+    </section>
+
+    <div class="vsplit" id="vsplit"></div>
+
+    <section class="col right">
+      <div class="pane viewport-pane">
+        <div id="viewport"></div>
+        <div class="hud tl">
+          <span class="badge" id="mode-badge">—</span>
+        </div>
+        <div class="hud tr">
+          <button class="chip" id="btn-com" aria-pressed="true">● 무게중심 보기</button>
+          <button class="chip" id="btn-follow" aria-pressed="true">카메라 따라가기</button>
+          <button class="chip" id="btn-view">시점 초기화</button>
+        </div>
+        <div class="hud bl" id="hud-body">
+          <div><span class="muted">몸 높이</span> <b id="hud-height">–</b></div>
+          <div><span class="muted">기울기</span> <b id="hud-tilt">–</b></div>
+          <div><span class="muted">무게중심 여유</span> <b id="hud-margin">–</b></div>
+        </div>
+        <div class="hud br">
+          <div class="muted small">발이 받는 무게</div>
+          <div class="feet" id="hud-feet"></div>
+        </div>
+        <div class="toast" id="toast"></div>
+        <div class="viewport-loading" id="viewport-loading">로봇 모델 불러오는 중…</div>
+      </div>
+      <div class="hsplit" data-target="panel-pane"></div>
+      <div class="pane panel-pane" id="panel-pane">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="joint">① 관절 하나씩</button>
+          <button class="tab" data-tab="foot">② 발 위치로</button>
+          <button class="tab" data-tab="gait">③ 걸음새</button>
+          <button class="tab" data-tab="com" title="노란 점 = 무게중심. 바닥에 닿은 발들이 만든 영역(지지 다각형) 안에 있어야 넘어지지 않아요">④ 무게중심</button>
+          <div class="tabs-right">
+            <div class="seg" id="pose-seg">
+              <button data-pose="lie">엎드리기</button><button data-pose="stand">서기</button><button data-pose="sit">앉기</button>
+            </div>
+            <label class="kp" title="모터가 목표 각도를 얼마나 세게 지키는지. 낮추면 몸무게에 눌려 무릎이 굽어요.">
+              <span>모터 힘 kp</span>
+              <input type="range" id="kp" min="20" max="250" value="120">
+              <b id="kp-val">120</b>
+            </label>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="tab-page active" data-page="joint">
+            <div class="row gap">
+              <div class="seg" id="leg-seg"></div>
+              <label class="check"><input type="checkbox" id="all-legs"> 네 다리 똑같이</label>
+            </div>
+            <div class="joint-grid">
+              <div id="joint-sliders"></div>
+              <div class="views">
+                <svg id="side-view" viewBox="0 0 300 250"></svg>
+                <svg id="back-view" viewBox="0 0 160 250"></svg>
+              </div>
+            </div>
+          </div>
+          <div class="tab-page" data-page="foot">
+            <div class="row gap">
+              <div class="seg" id="foot-seg"></div>
+            </div>
+            <div class="joint-grid">
+              <div>
+                <p class="hint">오른쪽 그림의 <b class="red">빨간 발끝</b>을 끌거나 슬라이더를 움직여 보세요. 컴퓨터가 그 위치에 발을 놓기 위한 각도를 거꾸로 계산해요 (역기구학).</p>
+                <div id="foot-sliders"></div>
+                <div class="ik-result" id="ik-result"></div>
+              </div>
+              <div class="views"><svg id="foot-view" viewBox="0 0 330 260"></svg></div>
+            </div>
+          </div>
+          <div class="tab-page" data-page="gait">
+            <div class="joint-grid">
+              <div>
+                <p class="hint">트롯: 대각선 두 다리(앞왼쪽+뒤오른쪽 ↔ 앞오른쪽+뒤왼쪽)가 번갈아 딛고 옮겨요.</p>
+                <div id="gait-sliders"></div>
+                <div class="row gap">
+                  <button class="btn primary" id="gait-start">▶ 걷기</button>
+                  <button class="btn ghost" id="gait-stop">■ 멈추기</button>
+                  <span class="speed" id="gait-speed"></span>
+                </div>
+                <p class="hint warn">실험: kp 를 60 아래로 낮추고 걸어 보세요. 왜 뒤로 갈까요? 발 드는 높이를 0 으로 하면?</p>
+              </div>
+              <div class="views"><svg id="gait-view" viewBox="0 0 330 200"></svg></div>
+            </div>
+          </div>
+          <div class="tab-page" data-page="com">
+            <div class="joint-grid">
+              <div>
+                <div id="com-status" class="com-status"></div>
+                <div id="payload-sliders"></div>
+                <div class="row gap">
+                  <button class="btn ghost" id="payload-clear">짐 내리기</button>
+                  <span class="muted small">시뮬레이터 전용 실험 · 로봇 몸무게 약 12 kg, 실제 Lite3 Pro 하중 약 4 kg</span>
+                </div>
+              </div>
+              <div class="views"><svg id="com-view" viewBox="0 0 300 300"></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="codebox">
+          <div class="codebox-head"><span>코드로 쓰면</span><button class="btn tiny ghost" id="btn-insert">편집기에 넣기 ↵</button></div>
+          <pre id="code-preview"></pre>
+        </div>
+        <div class="panel-lock" id="panel-lock">코드 실행 중에는 조작 패널을 쓸 수 없어요 · ■ 정지 후 사용</div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dlg">
+    <form method="dialog" class="dlg-body">
+      <h3 id="dlg-title"></h3>
+      <div id="dlg-content"></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel">취소</button>
+        <button class="btn primary" id="dlg-ok" value="ok">확인</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
